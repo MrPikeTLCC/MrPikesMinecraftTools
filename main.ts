@@ -157,65 +157,87 @@ function tunnelSegment(distance: number, width: number, height: number) {
     let error3 = 0
     return error3
 }
+
 // Bridge Building
-player.onChat("bridge", function (distance, wPadding, segmentSize) {
+player.onChat("bridge", function (segmentSize, segmentCount, wPadding) {
     agent.setAssist(DESTROY_OBSTACLES, true)
     torchfrequency = 0
-    agent.move(FORWARD, 1)
-    agent.move(LEFT, wPadding)
-    for (let index = 0; index < distance; index++) {
-        for (let segment = 0; segment < segmentSize && index < distance; segment++, index++) {
-            agent.setItem(STONE_BRICKS, 1+(wPadding*2), 1)
-            agent.setSlot(1)
-            for( let w = -wPadding; w <= wPadding; w++){
-                agent.place(DOWN)
-                if(w < wPadding){
-                    agent.move(RIGHT, 1)
-                }
-            }
-            agent.setSlot(2)
-            if (torchfrequency == segmentSize) {
-                agent.setItem(CHISELED_STONE_BRICKS, 2, 2)
-                agent.move(UP,1)
-                agent.place(DOWN)
-                agent.setItem(TORCH, 2, 2)
-                agent.move(LEFT, 1)
-                agent.place(RIGHT)
-                agent.move(DOWN,1)
-            } else {
-                agent.setItem(139, 2, 2)
-                agent.turn(RIGHT)
-                agent.move(BACK, 1)
-                agent.place(FORWARD)
-                agent.turn(LEFT)
-            }
-            agent.move(LEFT, (wPadding * 2)-1)
-            if (torchfrequency == segmentSize) {
-                agent.setItem(CHISELED_STONE_BRICKS, 2, 2)
-                agent.move(UP, 1)
-                agent.place(DOWN)
-                agent.setItem(TORCH, 2, 2)
-                agent.move(FORWARD, 1)
-                agent.place(BACK)
-                agent.move(DOWN, 1)
-            } else {
-                agent.setItem(139, 2, 2)
-                agent.turn(LEFT)
-                agent.move(BACK, 1)
-                agent.place(FORWARD)
-                agent.move(RIGHT,1)
-                agent.move(FORWARD,1)
-                agent.turn(RIGHT)
-            }
-            if (torchfrequency == segmentSize) {
-                torchfrequency = 0
-            }else{
-                torchfrequency += 1
-            }
-        }
+    for (let segment = 0; segment < segmentCount; segment++) {
+        bridgeSegment(segmentSize, wPadding)
     }
     agent.setAssist(DESTROY_OBSTACLES, false)
 })
+
+function bridgeSegment(segmentSize:number, wPadding:number){
+    for (let index = 0; index < segmentSize; index++) {
+        agent.move(FORWARD, 1)
+        agent.move(LEFT, wPadding)
+        agent.setItem(STONE_BRICKS, 1 + (wPadding * 2), 1)
+        for (let w = -wPadding; w <= wPadding; w++) {
+            if (index < segmentSize - 1){
+                // Normal Floor
+                agent.setSlot(1)
+                agent.place(DOWN)
+                if(w == -wPadding){
+                    // Left fence
+                    agent.setItem(139, 2, 2)
+                    agent.setSlot(2)
+                    agent.turn(LEFT)
+                    agent.move(BACK, 1)
+                    agent.place(FORWARD)
+                    agent.turn(RIGHT)
+                }else if(w == wPadding){
+                    // Right fence
+                    agent.setItem(139, 2, 2)
+                    agent.setSlot(2)
+                    agent.turn(RIGHT)
+                    agent.move(BACK, 1)
+                    agent.place(FORWARD)
+                    agent.turn(LEFT)
+                }else if (w < wPadding) {
+                    // Readjust position if not already moved during fence placement
+                    agent.move(RIGHT, 1)
+                }
+            } else { // Add torches and bridge supports at end of segment
+                if(w == -wPadding || w == wPadding){
+                    // Either side wall
+                    let agentPos = agent.getPosition()
+                    agent.move(UP, 1)
+                    let groundPos = positions.groundPosition(agentPos)
+                    blocks.fill(
+                        CHISELED_STONE_BRICKS,
+                        agentPos,
+                        groundPos,
+                        FillOperation.Replace
+                    )
+                    agent.setItem(TORCH, 2, 2)
+                    agent.setSlot(2)
+                    if (w == -wPadding) {
+                        // Left Side
+                        agent.move(RIGHT, 1)
+                        agent.place(LEFT)
+                        agent.move(DOWN, 1)
+                    }else{
+                        // Right Side
+                        agent.move(LEFT, 1)
+                        agent.place(RIGHT)
+                        agent.move(DOWN, 1)
+                    }
+                } else{
+                    // Normal Floor
+                    agent.setSlot(1)
+                    agent.place(DOWN)
+                    if (w < wPadding) {
+                        // Readjust position if not already moved during fence placement
+                        agent.move(RIGHT, 1)
+                    }
+                }
+            }
+        }
+        agent.move(LEFT, wPadding-1)
+    }
+}
+
 function GetPaneColour(colourID: number) {
     switch (colourID) {
         case 0: return WHITE_STAINED_GLASS_PANE;
