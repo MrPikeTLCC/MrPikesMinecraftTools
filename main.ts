@@ -247,6 +247,53 @@ player.onChat("simplewall", function (segmentSize, segmentCount, wPadding) {
     agent.setAssist(DESTROY_OBSTACLES, false)
 })
 
+player.onChat("castlewallhub", function (wPadding: number, targetHeight: number) {
+    agent.setAssist(DESTROY_OBSTACLES, true)
+    for (let f = -wPadding; f < wPadding; f++) {
+        agent.move(FORWARD, 1)
+        agent.move(LEFT, wPadding)
+        for (let w = -wPadding; w <= wPadding; w++) {
+            agent.setItem(STONE_BRICKS, 1 + (wPadding * 2), 1)
+            agent.place(DOWN)
+            if (w < wPadding) {
+                agent.move(RIGHT, 1)
+            }
+        }
+        agent.move(LEFT, wPadding)
+    }
+    agent.move(BACK, wPadding)
+    agent.move(LEFT, wPadding)
+
+    let currentHeight = agent.getPosition().getValue(Axis.Y)
+    agent.move(UP, targetHeight - currentHeight)
+
+    for (let f2 = 0; f2 < wPadding; f2++) {
+        for (let w2 = -wPadding; w2 <= wPadding; w2++) {
+            let agentPos = agent.getPosition()
+            agent.move(UP, 1) // Move above wall position 
+            if (f2 == wPadding) {
+                agent.move(UP, 2)
+            }
+            let groundPos = positions.groundPosition(agentPos)
+            blocks.fill(
+                CHISELED_STONE_BRICKS,
+                agentPos,
+                groundPos,
+                FillOperation.Replace
+            )
+            if (w2 < wPadding) {
+                agent.move(RIGHT, 1)
+                agent.move(DOWN, 1)
+            } else {
+                agent.move(FORWARD, 1)
+                agent.move(LEFT, wPadding * 2)
+                agent.move(DOWN, 1)
+            }
+        }
+    }
+    agent.setAssist(DESTROY_OBSTACLES, false)
+})
+
 player.onChat("castlewallRHS", function (distance: number, wPadding: number, targetHeight: number) {
     startCastleWall(true, distance, wPadding, targetHeight)
 })
@@ -260,6 +307,9 @@ function startCastleWall(RHS: boolean, distance: number, wPadding: number, targe
     let currentPos = 0
     agent.setAssist(DESTROY_OBSTACLES, true)
 
+    let dirA = RHS ? RIGHT : LEFT
+    let dirB = RHS ? LEFT : RIGHT
+
     // Build steps until we reach our goal height or run out of wall length
     let crenelation = currentPos % 2 > 0 // Make sure we end on crenelation
     while (currentPos < distance && currentHeight < targetHeight) {
@@ -267,7 +317,7 @@ function startCastleWall(RHS: boolean, distance: number, wPadding: number, targe
         let isFullHeight = false
         let nextIsFullHeight = false
         agent.move(FORWARD, 1)
-        agent.move(LEFT, wPadding)
+        agent.move(dirA, wPadding)
         agent.setItem(STONE_BRICKS, 1 + (wPadding * 2), 1)
         agent.setItem(COBBLESTONE_STAIRS, 1 + (wPadding * 2), 3)
 
@@ -280,38 +330,39 @@ function startCastleWall(RHS: boolean, distance: number, wPadding: number, targe
             }
 
             if (w < wPadding) {
-                agent.move(RIGHT, 1)
+                agent.move(dirB, 1)
             }
         }
-        agent.move(LEFT, wPadding * 2)
+        agent.move(dirA, wPadding)
 
         // SECOND PASS, build walls and steps
-        if (!RHS) {
-            agent.move(UP, (targetHeight - currentHeight))
-        }
+        agent.move(dirA, wPadding)
+        //if (!RHS) {
+        agent.move(UP, (targetHeight - currentHeight))
+        //}
         for (let w = -wPadding; w <= wPadding; w++) {
             // Switch from high to low or low to high
             if (w == 0) {
-                if (RHS) {
-                    while (agent.getPosition().getValue(Axis.Y) < targetHeight) {
-                        agent.move(UP, 1)
-                    }
-                } else {
-                    while (agent.getPosition().getValue(Axis.Y) > currentHeight) {
-                        agent.move(DOWN, 1)
-                    }
+                //if (RHS) {
+                //    while (agent.getPosition().getValue(Axis.Y) < targetHeight) {
+                //        agent.move(UP, 1)
+                //    }
+                //} else {
+                while (agent.getPosition().getValue(Axis.Y) > currentHeight) {
+                    agent.move(DOWN, 1)
                 }
+                //}
             }
 
             // Place walls
             if (w == -wPadding || w == wPadding) {
                 let wallOffset = 0;
-                if ((RHS && w == wPadding) || (!RHS && w == -wPadding)) {
+                if (w == -wPadding) {
                     wallOffset++;
                     if (crenelation) {
                         wallOffset++;
                     }
-                } else if ((RHS && w == -wPadding) || (!RHS && w == wPadding)) {
+                } else if (w == wPadding) {
                     wallOffset--;
                 }
                 agent.move(UP, wallOffset)
@@ -332,15 +383,15 @@ function startCastleWall(RHS: boolean, distance: number, wPadding: number, targe
                 }
                 if (w == -wPadding) {
                     // Left Side
-                    agent.move(RIGHT, 1)
+                    agent.move(dirB, 1)
                     if (crenelation) {
-                        agent.place(LEFT)
+                        agent.place(dirA)
                     }
                 } else if (w == wPadding) {
                     // Right Side
-                    agent.move(LEFT, 1)
+                    agent.move(dirA, 1)
                     if (crenelation) {
-                        agent.place(RIGHT)
+                        agent.place(dirB)
                     }
                 }
                 if (wallOffset > 0) {
@@ -348,7 +399,7 @@ function startCastleWall(RHS: boolean, distance: number, wPadding: number, targe
                 }
             } else if (w > -wPadding && w < wPadding) {
                 // Build thick floor\wall
-                if ((!RHS && w < 0) || RHS && w > 0) {
+                if (w < 0) {
                     agent.move(DOWN, 1)
                     let agentPos = agent.getPosition()
                     agent.move(UP, 1)
@@ -365,13 +416,13 @@ function startCastleWall(RHS: boolean, distance: number, wPadding: number, targe
                     agent.place(DOWN)
                 }
                 if (w < wPadding) {
-                    agent.move(RIGHT, 1)
+                    agent.move(dirB, 1)
                 }
             }
         }
 
         // Reset to start again, but one level higher
-        agent.move(LEFT, wPadding - 1)
+        agent.move(dirA, wPadding - 1)
         if (currentHeight < targetHeight) {
             currentHeight = agent.getPosition().getValue(Axis.Y)
         }
@@ -524,6 +575,7 @@ player.onChat("tunnel", function (distance, width, height) {
     }
     agent.setAssist(DESTROY_OBSTACLES, false)
 })
+
 function towerDecorativeRoom(colourID: number) {
     agent.setAssist(DESTROY_OBSTACLES, true)
     blocks.fill(
