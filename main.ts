@@ -168,17 +168,17 @@ player.onChat("bridge", function (segmentSize, segmentCount, wPadding) {
     agent.setAssist(DESTROY_OBSTACLES, false)
 })
 
-function bridgeSegment(segmentSize:number, wPadding:number){
+function bridgeSegment(segmentSize: number, wPadding: number) {
     for (let index = 0; index < segmentSize; index++) {
         agent.move(FORWARD, 1)
         agent.move(LEFT, wPadding)
         agent.setItem(STONE_BRICKS, 1 + (wPadding * 2), 1)
         for (let w = -wPadding; w <= wPadding; w++) {
-            if (index < segmentSize - 1){
+            if (index < segmentSize - 1) {
                 // Normal Floor
                 agent.setSlot(1)
                 agent.place(DOWN)
-                if(w == -wPadding){
+                if (w == -wPadding) {
                     // Left fence
                     agent.setItem(139, 2, 2)
                     agent.setSlot(2)
@@ -186,7 +186,7 @@ function bridgeSegment(segmentSize:number, wPadding:number){
                     agent.move(BACK, 1)
                     agent.place(FORWARD)
                     agent.turn(RIGHT)
-                }else if(w == wPadding){
+                } else if (w == wPadding) {
                     // Right fence
                     agent.setItem(139, 2, 2)
                     agent.setSlot(2)
@@ -194,12 +194,12 @@ function bridgeSegment(segmentSize:number, wPadding:number){
                     agent.move(BACK, 1)
                     agent.place(FORWARD)
                     agent.turn(LEFT)
-                }else if (w < wPadding) {
+                } else if (w < wPadding) {
                     // Readjust position if not already moved during fence placement
                     agent.move(RIGHT, 1)
                 }
             } else { // Add torches and bridge supports at end of segment
-                if(w == -wPadding || w == wPadding){
+                if (w == -wPadding || w == wPadding) {
                     // Either side wall
                     let agentPos = agent.getPosition()
                     agent.move(UP, 1)
@@ -217,13 +217,13 @@ function bridgeSegment(segmentSize:number, wPadding:number){
                         agent.move(RIGHT, 1)
                         agent.place(LEFT)
                         agent.move(DOWN, 1)
-                    }else{
+                    } else {
                         // Right Side
                         agent.move(LEFT, 1)
                         agent.place(RIGHT)
                         agent.move(DOWN, 1)
                     }
-                } else{
+                } else {
                     // Normal Floor
                     agent.setSlot(1)
                     agent.place(DOWN)
@@ -234,7 +234,220 @@ function bridgeSegment(segmentSize:number, wPadding:number){
                 }
             }
         }
-        agent.move(LEFT, wPadding-1)
+        agent.move(LEFT, wPadding - 1)
+    }
+}
+
+// Castle Wall Building
+player.onChat("simplewall", function (segmentSize, segmentCount, wPadding) {
+    agent.setAssist(DESTROY_OBSTACLES, true)
+    for (let segment = 0; segment < segmentCount; segment++) {
+        wallSegment(segmentSize, wPadding)
+    }
+    agent.setAssist(DESTROY_OBSTACLES, false)
+})
+
+player.onChat("castlewallRHS", function (distance: number, wPadding: number, targetHeight: number) {
+    startCastleWall(true, distance, wPadding, targetHeight)
+})
+
+player.onChat("castlewallLHS", function (distance: number, wPadding: number, targetHeight: number) {
+    startCastleWall(false, distance, wPadding, targetHeight)
+})
+
+function startCastleWall(RHS: boolean, distance: number, wPadding: number, targetHeight: number) {
+    let currentHeight = agent.getPosition().getValue(Axis.Y)
+    let currentPos = 0
+    agent.setAssist(DESTROY_OBSTACLES, true)
+
+    // Build steps until we reach our goal height or run out of wall length
+    let crenelation = currentPos % 2 > 0 // Make sure we end on crenelation
+    while (currentPos < distance && currentHeight < targetHeight) {
+        currentHeight++
+        let isFullHeight = false
+        let nextIsFullHeight = false
+        agent.move(FORWARD, 1)
+        agent.move(LEFT, wPadding)
+        agent.setItem(STONE_BRICKS, 1 + (wPadding * 2), 1)
+        agent.setItem(COBBLESTONE_STAIRS, 1 + (wPadding * 2), 3)
+
+        // FIRST PASS, building floor\support
+        agent.setSlot(1)
+        for (let w = -wPadding; w <= wPadding; w++) {
+            // Normal Floor on walkway, ignore walls on first pass
+            if (w > -wPadding && w < wPadding) { // Place supporting floor first so we can have rooms underneath
+                agent.place(DOWN)
+            }
+
+            if (w < wPadding) {
+                agent.move(RIGHT, 1)
+            }
+        }
+        agent.move(LEFT, wPadding * 2)
+
+        // SECOND PASS, build walls and steps
+        if (!RHS) {
+            agent.move(UP, (targetHeight - currentHeight))
+        }
+        for (let w = -wPadding; w <= wPadding; w++) {
+            // Switch from high to low or low to high
+            if (w == 0) {
+                if (RHS) {
+                    while (agent.getPosition().getValue(Axis.Y) < targetHeight) {
+                        agent.move(UP, 1)
+                    }
+                } else {
+                    while (agent.getPosition().getValue(Axis.Y) > currentHeight) {
+                        agent.move(DOWN, 1)
+                    }
+                }
+            }
+
+            // Place walls
+            if (w == -wPadding || w == wPadding) {
+                let wallOffset = 0;
+                if ((RHS && w == wPadding) || (!RHS && w == -wPadding)) {
+                    wallOffset++;
+                    if (crenelation) {
+                        wallOffset++;
+                    }
+                } else if ((RHS && w == -wPadding) || (!RHS && w == wPadding)) {
+                    wallOffset--;
+                }
+                agent.move(UP, wallOffset)
+
+                let agentPos = agent.getPosition()
+                agent.move(UP, 1) // Move above wall position 
+                let groundPos = positions.groundPosition(agentPos)
+                blocks.fill(
+                    CHISELED_STONE_BRICKS,
+                    agentPos,
+                    groundPos,
+                    FillOperation.Replace
+                )
+                // Only put crenelation on walls
+                if (crenelation && (w == -wPadding || w == wPadding)) {
+                    agent.setItem(TORCH, 2, 2)
+                    agent.setSlot(2)
+                }
+                if (w == -wPadding) {
+                    // Left Side
+                    agent.move(RIGHT, 1)
+                    if (crenelation) {
+                        agent.place(LEFT)
+                    }
+                } else if (w == wPadding) {
+                    // Right Side
+                    agent.move(LEFT, 1)
+                    if (crenelation) {
+                        agent.place(RIGHT)
+                    }
+                }
+                if (wallOffset > 0) {
+                    agent.move(DOWN, wallOffset)
+                }
+            } else if (w > -wPadding && w < wPadding) {
+                // Build thick floor\wall
+                if ((!RHS && w < 0) || RHS && w > 0) {
+                    agent.move(DOWN, 1)
+                    let agentPos = agent.getPosition()
+                    agent.move(UP, 1)
+                    let groundPos = positions.groundPosition(agentPos)
+                    blocks.fill(
+                        CHISELED_STONE_BRICKS,
+                        agentPos,
+                        groundPos,
+                        FillOperation.Replace
+                    )
+                } else {
+                    // Place steps
+                    agent.setSlot(3)
+                    agent.place(DOWN)
+                }
+                if (w < wPadding) {
+                    agent.move(RIGHT, 1)
+                }
+            }
+        }
+
+        // Reset to start again, but one level higher
+        agent.move(LEFT, wPadding - 1)
+        if (currentHeight < targetHeight) {
+            currentHeight = agent.getPosition().getValue(Axis.Y)
+        }
+        crenelation = !crenelation
+        currentPos++
+    }
+
+    // Finish the wall
+    while (currentPos < distance) {
+        let remainder = currentPos % 8
+        if (remainder > 0) {
+            // Finish the current segment at full height
+            wallSegment(8 - remainder, wPadding)
+            currentPos += remainder
+        } else {
+            // Make a whole segment
+            wallSegment(8, wPadding)
+            currentPos += 8
+        }
+    }
+    agent.setAssist(DESTROY_OBSTACLES, false)
+}
+
+function wallSegment(segmentSize: number, wPadding: number) {
+    let crenelation = segmentSize % 2 > 0 // Make sure we end on crenelation
+    for (let index = 0; index < segmentSize; index++) {
+        agent.move(FORWARD, 1)
+        agent.move(LEFT, wPadding)
+        agent.setItem(STONE_BRICKS, 1 + (wPadding * 2), 1)
+        for (let w = -wPadding; w <= wPadding; w++) {
+            if (w == -wPadding || w == wPadding) {
+                // Either side wall
+                if (crenelation) {
+                    agent.move(UP, 1) // Extra height on wall
+                }
+                let agentPos = agent.getPosition()
+                agent.move(UP, 1) // Move above wall position
+                let groundPos = positions.groundPosition(agentPos)
+                blocks.fill(
+                    CHISELED_STONE_BRICKS,
+                    agentPos,
+                    groundPos,
+                    FillOperation.Replace
+                )
+                if (crenelation) {
+                    agent.setItem(TORCH, 2, 2)
+                    agent.setSlot(2)
+                }
+                if (w == -wPadding) {
+                    // Left Side
+                    agent.move(RIGHT, 1)
+                    if (crenelation) {
+                        agent.place(LEFT)
+                        agent.move(DOWN, 1)
+                    }
+                } else {
+                    // Right Side
+                    agent.move(LEFT, 1)
+                    if (crenelation) {
+                        agent.place(RIGHT)
+                        agent.move(DOWN, 1)
+                    }
+                }
+                agent.move(DOWN, 1)
+            } else {
+                // Normal Floor
+                agent.setSlot(1)
+                agent.place(DOWN)
+                if (w < wPadding) {
+                    // Readjust position if not already moved during fence placement
+                    agent.move(RIGHT, 1)
+                }
+            }
+        }
+        agent.move(LEFT, wPadding - 1)
+        crenelation = !crenelation
     }
 }
 
@@ -701,8 +914,10 @@ player.onChat("autoladder", function () {
         agent.move(UP, 1)
     }
 })
-player.onChat("moveagent", function (distance) {
-    agent.move(FORWARD, distance)
+player.onChat("moveagent", function (forward, upward, rightward) {
+    agent.move(FORWARD, forward)
+    agent.move(UP, upward)
+    agent.move(RIGHT, rightward)
 })
 player.onChat("agentorientation", function () {
     player.say(agent.getOrientation())
