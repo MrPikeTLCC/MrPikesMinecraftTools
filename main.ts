@@ -163,16 +163,26 @@ player.onChat("bridge", function (segmentSize, segmentCount, wPadding) {
     agent.setAssist(DESTROY_OBSTACLES, true)
     torchfrequency = 0
     for (let segment = 0; segment < segmentCount; segment++) {
-        bridgeSegment(segmentSize, wPadding)
+        bridgeSegment(segmentSize, wPadding, STONE_BRICKS, CHISELED_STONE_BRICKS, 139, TORCH)
     }
     agent.setAssist(DESTROY_OBSTACLES, false)
 })
 
-function bridgeSegment(segmentSize: number, wPadding: number) {
+// Bridge Building
+player.onChat("bridgeglow", function (segmentSize, segmentCount, wPadding) {
+    agent.setAssist(DESTROY_OBSTACLES, true)
+    torchfrequency = 0
+    for (let segment = 0; segment < segmentCount; segment++) {
+        bridgeSegment(segmentSize, wPadding, STONE_BRICKS, CHISELED_STONE_BRICKS, 139, GLOWSTONE)
+    }
+    agent.setAssist(DESTROY_OBSTACLES, false)
+})
+
+function bridgeSegment(segmentSize: number, wPadding: number, bridgeBlock: any, supportBlock: any, fenceBlock: any, lightBlock: any) {
     for (let index = 0; index < segmentSize; index++) {
         agent.move(FORWARD, 1)
         agent.move(LEFT, wPadding)
-        agent.setItem(STONE_BRICKS, 1 + (wPadding * 2), 1)
+        agent.setItem(bridgeBlock, 1 + (wPadding * 2), 1)
         for (let w = -wPadding; w <= wPadding; w++) {
             if (index < segmentSize - 1) {
                 // Normal Floor
@@ -188,7 +198,7 @@ function bridgeSegment(segmentSize: number, wPadding: number) {
                     agent.turn(RIGHT)
                 } else if (w == wPadding) {
                     // Right fence
-                    agent.setItem(139, 2, 2)
+                    agent.setItem(fenceBlock, 2, 2)
                     agent.setSlot(2)
                     agent.turn(RIGHT)
                     agent.move(BACK, 1)
@@ -205,12 +215,12 @@ function bridgeSegment(segmentSize: number, wPadding: number) {
                     agent.move(UP, 1)
                     let groundPos = positions.groundPosition(agentPos)
                     blocks.fill(
-                        CHISELED_STONE_BRICKS,
+                        supportBlock,
                         agentPos,
                         groundPos,
                         FillOperation.Replace
                     )
-                    agent.setItem(TORCH, 2, 2)
+                    agent.setItem(lightBlock, 2, 2)
                     agent.setSlot(2)
                     if (w == -wPadding) {
                         // Left Side
