@@ -161,9 +161,16 @@ function tunnelSegment(distance: number, width: number, height: number) {
 // Bridge Building
 player.onChat("bridge", function (segmentSize, segmentCount, wPadding) {
     agent.setAssist(DESTROY_OBSTACLES, true)
-    torchfrequency = 0
     for (let segment = 0; segment < segmentCount; segment++) {
-        bridgeSegment(segmentSize, wPadding, STONE_BRICKS, CHISELED_STONE_BRICKS, 139, TORCH)
+        bridgeSegment(segmentSize, wPadding, STONE_BRICKS, 0, CHISELED_STONE_BRICKS, 139, TORCH, AIR, 0)
+    }
+    agent.setAssist(DESTROY_OBSTACLES, false)
+})
+
+player.onChat("bridgemoss", function (segmentSize, segmentCount, wPadding) {
+    agent.setAssist(DESTROY_OBSTACLES, true)
+    for (let segment = 0; segment < segmentCount; segment++) {
+        bridgeSegment(segmentSize, wPadding, COBBLESTONE, 0.2, MOSS_STONE, 139, CAMPFIRE, AIR, 0)
     }
     agent.setAssist(DESTROY_OBSTACLES, false)
 })
@@ -171,26 +178,45 @@ player.onChat("bridge", function (segmentSize, segmentCount, wPadding) {
 // Bridge Building
 player.onChat("bridgeglow", function (segmentSize, segmentCount, wPadding) {
     agent.setAssist(DESTROY_OBSTACLES, true)
-    torchfrequency = 0
     for (let segment = 0; segment < segmentCount; segment++) {
-        bridgeSegment(segmentSize, wPadding, STONE_BRICKS, CHISELED_STONE_BRICKS, 139, GLOWSTONE)
+        bridgeSegment(segmentSize, wPadding, STONE_BRICKS, 0, CHISELED_STONE_BRICKS, 139, GLOWSTONE, AIR, 0)
     }
     agent.setAssist(DESTROY_OBSTACLES, false)
 })
 
-function bridgeSegment(segmentSize: number, wPadding: number, bridgeBlock: any, supportBlock: any, fenceBlock: any, lightBlock: any) {
+player.onChat("bridgedown", function (segmentSize, segmentCount, wPadding) {
+    agent.setAssist(DESTROY_OBSTACLES, true)
+    for (let segment = 0; segment < segmentCount; segment++) {
+        bridgeSegment(segmentSize, wPadding, STONE_BRICKS, 0, CHISELED_STONE_BRICKS, CHISELED_STONE_BRICKS, TORCH, STONE_BRICK_STAIRS, -1)
+    }
+    agent.setAssist(DESTROY_OBSTACLES, false)
+})
+
+function bridgeSegment(segmentSize: number, wPadding: number, bridgeBlock: any, randomChance: number, supportBlock: any, fenceBlock: any, lightBlock: any, stairBlock: any, yStep: number) {
     for (let index = 0; index < segmentSize; index++) {
-        agent.move(FORWARD, 1)
+        if (yStep == 0 || index == 0) {
+            agent.move(FORWARD, 1)
+        }
+        if (yStep != 0) {
+            agent.move(UP, yStep)
+        }
+        
         agent.move(LEFT, wPadding)
+
         agent.setItem(bridgeBlock, 1 + (wPadding * 2), 1)
+        agent.setItem(supportBlock, 1 + (wPadding * 2), 4)
         for (let w = -wPadding; w <= wPadding; w++) {
             if (index < segmentSize - 1) {
                 // Normal Floor
-                agent.setSlot(1)
+                if (Math.random() * 1 > randomChance) {
+                    agent.setSlot(4)
+                } else {
+                    agent.setSlot(1)
+                }
                 agent.place(DOWN)
                 if (w == -wPadding) {
                     // Left fence
-                    agent.setItem(139, 2, 2)
+                    agent.setItem(fenceBlock, 2, 2)
                     agent.setSlot(2)
                     agent.turn(LEFT)
                     agent.move(BACK, 1)
@@ -244,7 +270,38 @@ function bridgeSegment(segmentSize: number, wPadding: number, bridgeBlock: any, 
                 }
             }
         }
-        agent.move(LEFT, wPadding - 1)
+        if (yStep != 0) {
+            agent.setItem(stairBlock, wPadding * 2, 5)
+            agent.setSlot(5)
+            if (yStep < 0) {
+                agent.move(FORWARD, 1)
+                agent.turn(RIGHT)
+                agent.turn(RIGHT)
+                for (let w = wPadding - 1; w > -wPadding; w--) {
+                    agent.place(FORWARD)
+                    if (w > -wPadding + 1) {
+                        agent.move(RIGHT, 1)
+                    }
+                }
+                agent.turn(RIGHT)
+                agent.turn(RIGHT)
+                agent.move(RIGHT, wPadding - 1)
+            } else {
+                agent.move(UP, 1)
+                agent.move(DOWN, segmentSize - 1)
+                for (let w = wPadding - 1; w > -wPadding; w--) {
+                    agent.place(BACK)
+                    if (w > -wPadding + 1) {
+                        agent.move(LEFT, 1)
+                    }
+                }
+                agent.move(RIGHT, wPadding - 1)
+                agent.move(FORWARD, 1)
+                agent.move(DOWN, 1)
+            }
+        } else {
+            agent.move(LEFT, wPadding - 1)
+        }
     }
 }
 
@@ -538,8 +595,8 @@ player.onChat("tunnel", function (distance, width, height) {
     agent.setAssist(DESTROY_OBSTACLES, true)
     torchfrequency = 5
     agent.setSlot(1)
-    for (let index = 0; index < distance; index++) {
-        for (let index = 0; index < width - 1; index++) {
+    for (let iD = 0; iD < distance; iD++) {
+        for (let iW = 0; iW < width - 1; iW++) {
             blocks.fill(
                 AIR,
                 positions.add(
@@ -582,6 +639,63 @@ player.onChat("tunnel", function (distance, width, height) {
             torchfrequency += -1
         }
         agent.move(FORWARD, 1)
+    }
+    agent.setAssist(DESTROY_OBSTACLES, false)
+})
+
+player.onChat("infinitetunnel", function (width, height) {
+    agent.setAssist(DESTROY_OBSTACLES, true)
+    torchfrequency = 5
+    agent.setSlot(1)
+    let continueTunnelling = agent.inspect(AgentInspection.Block, FORWARD) != AIR && agent.inspect(AgentInspection.Block, FORWARD) != WATER && agent.inspect(AgentInspection.Block, FORWARD) != LAVA;
+    while (continueTunnelling) {
+        for (let iW = 0; iW < width - 1 && continueTunnelling; iW++) {
+            blocks.fill(
+                AIR,
+                positions.add(
+                    agent.getPosition(),
+                    pos(0, 0, 0)
+                ),
+                positions.add(
+                    agent.getPosition(),
+                    pos(0, height, 0)
+                ),
+                FillOperation.Replace
+            )
+            agent.move(RIGHT, 1)
+            continueTunnelling = agent.inspect(AgentInspection.Block, FORWARD) != AIR && agent.inspect(AgentInspection.Block, FORWARD) != WATER && agent.inspect(AgentInspection.Block, FORWARD) != LAVA;
+        }
+        if (continueTunnelling) {
+            blocks.fill(
+                AIR,
+                positions.add(
+                    agent.getPosition(),
+                    pos(0, 0, 0)
+                ),
+                positions.add(
+                    agent.getPosition(),
+                    pos(0, height, 0)
+                ),
+                FillOperation.Replace
+            )
+            if (torchfrequency == 0) {
+                agent.setItem(TORCH, 2, 1)
+                agent.move(UP, 1)
+                agent.place(RIGHT)
+                agent.move(DOWN, 1)
+            }
+            agent.move(LEFT, width - 1)
+            if (torchfrequency == 0) {
+                agent.move(UP, 1)
+                agent.place(LEFT)
+                agent.move(DOWN, 1)
+                torchfrequency = 5
+            } else {
+                torchfrequency += -1
+            }
+            agent.move(FORWARD, 1)
+            continueTunnelling = agent.inspect(AgentInspection.Block, FORWARD) != AIR && agent.inspect(AgentInspection.Block, FORWARD) != WATER && agent.inspect(AgentInspection.Block, FORWARD) != LAVA;
+        }
     }
     agent.setAssist(DESTROY_OBSTACLES, false)
 })
